@@ -1,7 +1,9 @@
 use proc_macro::TokenStream;
+use proc_macro2::TokenTree;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{parse_macro_input, DeriveInput, parse_quote};
 
+/// Checks if the type is an option. If it is, will return Some(ty) or None
 fn ty_is_option(ty: &syn::Type) -> Option<&syn::Type> {
     if let syn::Type::Path(ref p) = ty {
         if p.path.segments.len() != 1 || p.path.segments[0].ident != "Option" {
@@ -22,8 +24,9 @@ fn ty_is_option(ty: &syn::Type) -> Option<&syn::Type> {
     None
 }
 
-#[proc_macro_derive(Builder)]
-pub fn derive_builder(input: TokenStream) -> TokenStream {
+/// The entry point for the derive macro
+#[proc_macro_derive(Builder, attributes(builder))]
+pub fn derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     let name = &ast.ident;
     let bname = format!("{}Builder", name);
@@ -68,6 +71,36 @@ pub fn derive_builder(input: TokenStream) -> TokenStream {
         }
     });
 
+    // TODO: Use parsemeta instead <21-11-20, Brian> //
+    // eprintln!("{:#?}", fields);
+    let extend_methods = fields.iter().filter_map(|f| {
+        for attr in &f.attrs {
+            if attr.path.segments.len() == 1 && attr.path.segments[0].ident == "builder" {
+                if let Some(proc_macro2::TokenTree::Group(g)) = attr.tokens.clone().into_iter().next() {
+                    let mut tokens = g.stream().into_iter();
+                    match tokens.next().unwrap() {
+                        TokenTree::Ident(ref i) => assert_eq!(i, "each"),
+                        tt => panic!("expected 'each', found {}", tt)
+                    }
+                    match tokens.next().unwrap() {
+                        TokenTree::Punct(ref p) => assert_eq!(p.as_char(), '='),
+                        tt => panic!("expected '=', fount {}", tt),
+                    }
+                    let arg_tok = tokens.next().unwrap();
+                    let arg_lit: syn::Lit = syn::parse2(arg_tok.into()).expect("Failed to parse into literal");
+                    let arg_ident: syn::Ident = match arg_lit {
+                        syn::Lit::Str(lit_str) => lit_str.parse().expect("Failed to parse lit_str into Ident"),
+                        _ => panic!("It must be a string literal"),
+                    };
+                    return Some(quote! { fn #arg_ident() {} })
+                } else {
+                    eprintln!("Error if let did not work")
+                }
+            }
+        }
+        None
+    });
+
     let build_fields = fields.iter().map(|f| {
         let name = &f.ident;
         let ty = &f.ty;
@@ -96,6 +129,8 @@ pub fn derive_builder(input: TokenStream) -> TokenStream {
 
         impl #bident {
             #(#methods)*
+
+            #(#extend_methods)*
 
             pub fn build(&self) -> std::result::Result<#name, Box<dyn std::error::Error>> {
                 Ok(#name {
