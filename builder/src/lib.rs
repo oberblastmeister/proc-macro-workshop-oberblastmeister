@@ -1,3 +1,4 @@
+mod valid;
 mod expand;
 mod ast;
 
@@ -29,6 +30,7 @@ fn ty_is_option(ty: &syn::Type) -> Option<&syn::Type> {
 
 #[proc_macro_derive(Builder, attributes(builder))]
 pub fn derive_builder(input: TokenStream) -> TokenStream {
+    eprintln!("{:#?}", input);
     let input = parse_macro_input!(input as DeriveInput);
     expand::derive(&input)
         .unwrap_or_else(|err| err.to_compile_error())

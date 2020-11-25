@@ -1,6 +1,7 @@
+use std::fmt;
 use proc_macro2::Span;
 use quote::ToTokens;
-use syn::{Attribute, Data, DataStruct, DeriveInput, Error, Generics, Member, Result, Type};
+use syn::{Attribute, Data, DataStruct, DeriveInput, Error, Generics, Member, Result, Type, Fields};
 
 pub enum Input<'a> {
     Struct(Struct<'a>),
@@ -43,8 +44,16 @@ impl<'a> Struct<'a> {
     pub fn from_syn(node: &'a DeriveInput, data: &'a DataStruct) -> Result<Struct<'a>> {
         let attrs = Attrs::get(&node.attrs);
         let span = Span::call_site();
-        eprintln!("The span is:");
+        let fields = Field::multiple_from_syn(&data.fields, span)?;
+        eprintln!("The call site span is:");
         eprintln!("{:#?}", span);
+        Ok(
+            Struct {
+                original: node,
+                generics: &node.generics,
+                fields,
+            }
+        )
     }
 }
 
@@ -59,6 +68,14 @@ impl<'a> Attrs<'a> {
 }
 
 impl<'a> Field<'a> {
+    fn multiple_from_syn(fields: &'a Fields, span: Span) -> Result<Vec<Self>> {
+        fields
+            .iter()
+            .enumerate()
+            .map(|(i, field)| Field::from_syn(i, field, span))
+            .collect()
+    }
+
     fn from_syn(i: usize, node: &'a syn::Field, span: Span) -> Result<Self> {
         Ok(Field {
             original: node,
