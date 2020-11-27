@@ -3,34 +3,10 @@ mod expand;
 mod ast;
 
 use proc_macro::TokenStream;
-use proc_macro2::TokenTree;
-use quote::quote;
-use syn::{parse_macro_input, DeriveInput, parse_quote};
+use syn::{parse_macro_input, DeriveInput};
 
-/// Checks if the type is an option. If it is, will return Some(ty) or None
-fn ty_is_option(ty: &syn::Type) -> Option<&syn::Type> {
-    if let syn::Type::Path(ref p) = ty {
-        if p.path.segments.len() != 1 || p.path.segments[0].ident != "Option" {
-            return None;
-        }
-
-        if let syn::PathArguments::AngleBracketed(ref inner_ty) = p.path.segments[0].arguments {
-            if inner_ty.args.len() != 1 {
-                return None;
-            }
-
-            let innert_ty = inner_ty.args.first().unwrap();
-            if let syn::GenericArgument::Type(ref ty) = innert_ty {
-                return Some(ty);
-            }
-        }
-    }
-    None
-}
-
-#[proc_macro_derive(Builder, attributes(builder))]
+#[proc_macro_derive(Builder, attributes(builder, each))]
 pub fn derive_builder(input: TokenStream) -> TokenStream {
-    eprintln!("{:#?}", input);
     let input = parse_macro_input!(input as DeriveInput);
     expand::derive(&input)
         .unwrap_or_else(|err| err.to_compile_error())

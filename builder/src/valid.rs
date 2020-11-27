@@ -1,4 +1,5 @@
-use crate::ast::Input;
+use syn::Result;
+use crate::ast::{Struct, Input};
 
 impl Input<'_> {
     pub fn validate(&self) -> Result<()> {
@@ -9,5 +10,7 @@ impl Input<'_> {
 }
 
 impl Struct<'_> {
-
+    pub fn validate(&self) -> Result<()> {
+        Ok(())
+    }
 }
